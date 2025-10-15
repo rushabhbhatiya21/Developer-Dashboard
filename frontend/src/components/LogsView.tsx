@@ -5,6 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { SidebarTrigger } from "./ui/sidebar";
 import { ScrollArea } from "./ui/scroll-area";
 import { Search, Download, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { socketService } from "../services/socketService";
 
 interface LogEntry {
   id: string;
@@ -14,7 +16,7 @@ interface LogEntry {
   message: string;
 }
 
-const logs: LogEntry[] = [
+const defaultLogs: LogEntry[] = [
   {
     id: "1",
     timestamp: "2025-10-09 14:32:15",
@@ -89,6 +91,57 @@ function getLevelColor(level: string): string {
 }
 
 export function LogsView() {
+  const [logs, setLogs] = useState<LogEntry[]>(defaultLogs);
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    socketService.connect();
+
+    const unsubscribeOpen = socketService.subscribe('connection_open', () => {
+      setIsConnected(true);
+    });
+
+    const unsubscribeError = socketService.subscribe('connection_error', () => {
+      setIsConnected(false);
+    });
+
+    const unsubscribeWorkerStatus = socketService.subscribe('worker_status_change', (data) => {
+      addLogEntry('info', data.worker.name, `Worker status changed to ${data.worker.worker_status}`);
+    });
+
+    const unsubscribeWorkerReg = socketService.subscribe('worker_registered', (data) => {
+      addLogEntry('info', 'System', `Worker ${data.worker_id} registered`);
+    });
+
+    const unsubscribeWorkerDereg = socketService.subscribe('worker_deregistered', (data) => {
+      addLogEntry('warning', 'System', `Worker ${data.worker_id} deregistered`);
+    });
+
+    return () => {
+      unsubscribeOpen();
+      unsubscribeError();
+      unsubscribeWorkerStatus();
+      unsubscribeWorkerReg();
+      unsubscribeWorkerDereg();
+    };
+  }, []);
+
+  const addLogEntry = (level: LogEntry['level'], service: string, message: string) => {
+    const newLog: LogEntry = {
+      id: String(Date.now()),
+      timestamp: new Date().toLocaleString(),
+      level,
+      service,
+      message,
+    };
+    setLogs((prev) => [newLog, ...prev].slice(0, 100));
+  };
+
+  const handleRefresh = () => {
+    socketService.disconnect();
+    socketService.connect();
+  };
+
   return (
     <div className="size-full">
       <div className="border-b border-border bg-card px-6 py-4">
@@ -101,7 +154,13 @@ export function LogsView() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            <div className="flex items-center gap-2 mr-4">
+              <div className={`size-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
+              <span className="text-xs text-muted-foreground">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
               <RefreshCw className="size-4 mr-2" />
               Refresh
             </Button>

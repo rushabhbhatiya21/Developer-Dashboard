@@ -4,6 +4,8 @@ import { Button } from "./ui/button";
 import { SidebarTrigger } from "./ui/sidebar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { AlertCircle, AlertTriangle, CheckCircle, RefreshCw, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { socketService } from "../services/socketService";
 
 interface QueueDetail {
   id: string;
@@ -15,7 +17,7 @@ interface QueueDetail {
   lastProcessed: string;
 }
 
-const queues: QueueDetail[] = [
+const defaultQueues: QueueDetail[] = [
   {
     id: "1",
     name: "email.send",
@@ -75,6 +77,65 @@ function getStatusIcon(status: string) {
 }
 
 export function QueuesView() {
+  const [queues, setQueues] = useState<QueueDetail[]>(defaultQueues);
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    socketService.connect();
+
+    const unsubscribeOpen = socketService.subscribe('connection_open', () => {
+      setIsConnected(true);
+    });
+
+    const unsubscribeError = socketService.subscribe('connection_error', () => {
+      setIsConnected(false);
+    });
+
+    const unsubscribeInitial = socketService.subscribe('initial_data', (data) => {
+      updateQueuesFromData(data);
+    });
+
+    const unsubscribeUpdate = socketService.subscribe('dashboard_update', (data) => {
+      updateQueuesFromData(data);
+    });
+
+    return () => {
+      unsubscribeOpen();
+      unsubscribeError();
+      unsubscribeInitial();
+      unsubscribeUpdate();
+    };
+  }, []);
+
+  const updateQueuesFromData = (data: any) => {
+    if (!data || !data.workers) return;
+
+    const updatedQueues: QueueDetail[] = data.workers.map((worker: any, index: number) => {
+      const errorCount = worker.error_count || 0;
+      let status: "ok" | "warning" | "critical" = "ok";
+
+      if (errorCount > 10) status = "critical";
+      else if (errorCount > 5) status = "warning";
+
+      return {
+        id: String(index + 1),
+        name: worker.name.toLowerCase().replace(/\s+/g, '.'),
+        messages: worker.total_processed || 0,
+        consumers: worker.healthy ? 1 : 0,
+        rate: `${worker.total_processed || 0}/total`,
+        status,
+        lastProcessed: worker.last_checked ? new Date(worker.last_checked).toLocaleString() : 'N/A',
+      };
+    });
+
+    setQueues(updatedQueues);
+  };
+
+  const handleRefresh = () => {
+    socketService.disconnect();
+    socketService.connect();
+  };
+
   return (
     <div className="size-full">
       <div className="border-b border-border bg-card px-6 py-4">
@@ -86,10 +147,18 @@ export function QueuesView() {
               <p className="text-sm text-muted-foreground">Monitor and manage message queues</p>
             </div>
           </div>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="size-4 mr-2" />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mr-4">
+              <div className={`size-2 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-red-500'} animate-pulse`} />
+              <span className="text-xs text-muted-foreground">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
+              <RefreshCw className="size-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
       </div>
 

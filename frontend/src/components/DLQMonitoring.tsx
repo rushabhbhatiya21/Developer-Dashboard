@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { AlertCircle, AlertTriangle, CheckCircle } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface QueueMetric {
   name: string;
@@ -8,7 +9,7 @@ interface QueueMetric {
   status: "ok" | "warning" | "critical";
 }
 
-const queueMetrics: QueueMetric[] = [
+const defaultQueueMetrics: QueueMetric[] = [
   { name: "Email Queue", count: 0, status: "ok" },
   { name: "Processing Queue", count: 12, status: "ok" },
   { name: "Notification Queue", count: 3, status: "ok" },
@@ -28,7 +29,33 @@ function getStatusIcon(status: string) {
   }
 }
 
-export function DLQMonitoring() {
+interface DLQMonitoringProps {
+  data?: any;
+}
+
+export function DLQMonitoring({ data }: DLQMonitoringProps) {
+  const [queueMetrics, setQueueMetrics] = useState<QueueMetric[]>(defaultQueueMetrics);
+
+  useEffect(() => {
+    if (!data || !data.workers) return;
+
+    const updatedMetrics = data.workers.map((worker: any) => {
+      const errorCount = worker.error_count || 0;
+      let status: "ok" | "warning" | "critical" = "ok";
+
+      if (errorCount > 10) status = "critical";
+      else if (errorCount > 5) status = "warning";
+
+      return {
+        name: worker.name,
+        count: worker.total_processed || 0,
+        status,
+      };
+    });
+
+    setQueueMetrics(updatedMetrics);
+  }, [data]);
+
   const totalDLQ = queueMetrics
     .filter((q) => q.name.startsWith("DLQ"))
     .reduce((sum, q) => sum + q.count, 0);

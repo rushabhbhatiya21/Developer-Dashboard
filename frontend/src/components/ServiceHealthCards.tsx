@@ -1,6 +1,7 @@
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { Database, Cpu, HardDrive, Box, GitBranch, Server } from "lucide-react";
+import { Database, Cpu, HardDrive, Box, GitBranch, Server, Activity } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type ServiceStatus = "healthy" | "degraded" | "down";
 
@@ -13,7 +14,7 @@ interface Service {
   icon: any;
 }
 
-const services: Service[] = [
+const defaultServices: Service[] = [
   {
     id: "postgres",
     name: "PostgreSQL",
@@ -86,7 +87,39 @@ function getStatusBadgeVariant(status: ServiceStatus): "default" | "secondary" |
   }
 }
 
-export function ServiceHealthCards() {
+interface ServiceHealthCardsProps {
+  data?: any;
+}
+
+export function ServiceHealthCards({ data }: ServiceHealthCardsProps) {
+  const [services, setServices] = useState<Service[]>(defaultServices);
+
+  useEffect(() => {
+    if (!data || !data.workers) return;
+
+    const updatedServices = data.workers.map((worker: any) => {
+      const iconMap: { [key: string]: any } = {
+        'Server': Server,
+        'OCR Worker': Activity,
+        'LLM Worker': Cpu,
+        'O1 LLM Worker': Cpu,
+        'Summary Worker': Box,
+        'Strikethrough Worker': Box,
+      };
+
+      return {
+        id: worker.name.toLowerCase().replace(/\s+/g, '_'),
+        name: worker.name,
+        status: worker.healthy ? 'healthy' : 'down',
+        uptime: worker.worker_status === 'running' ? '100%' : '0%',
+        responseTime: worker.response_time || 'N/A',
+        icon: iconMap[worker.name] || Activity,
+      };
+    });
+
+    setServices(updatedServices);
+  }, [data]);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {services.map((service) => {

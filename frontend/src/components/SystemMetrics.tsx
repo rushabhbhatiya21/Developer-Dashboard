@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { useEffect, useState } from "react";
 
 const cpuData = [
   { time: "00:00", value: 45 },
@@ -31,7 +32,35 @@ const requestsData = [
   { time: "23:59", value: 1500 },
 ];
 
-export function SystemMetrics() {
+interface SystemMetricsProps {
+  data?: any;
+}
+
+export function SystemMetrics({ data }: SystemMetricsProps) {
+  const [cpuCurrent, setCpuCurrent] = useState(68);
+  const [cpuAverage, setCpuAverage] = useState(58);
+  const [memoryCurrent, setMemoryCurrent] = useState(5.9);
+  const [memoryTotal, setMemoryTotal] = useState(16);
+  const [requestsCurrent, setRequestsCurrent] = useState(3200);
+  const [requestsPeak, setRequestsPeak] = useState(3800);
+
+  useEffect(() => {
+    if (!data || !data.workers) return;
+
+    const totalCpu = data.workers.reduce((sum: number, w: any) => sum + (w.cpu || 0), 0);
+    const avgCpu = data.workers.length > 0 ? totalCpu / data.workers.length : 0;
+
+    const totalMemory = data.workers.reduce((sum: number, w: any) => sum + (w.memory || 0), 0);
+
+    const totalProcessed = data.summary?.total_processed || 0;
+
+    setCpuCurrent(Math.round(avgCpu));
+    setCpuAverage(Math.round(avgCpu * 0.85));
+    setMemoryCurrent(Number((totalMemory / 1024).toFixed(1)));
+    setRequestsCurrent(totalProcessed);
+    setRequestsPeak(Math.max(totalProcessed, requestsPeak));
+  }, [data]);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Card className="bg-card border-border">
@@ -68,7 +97,7 @@ export function SystemMetrics() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">Current: 68% | Average: 58%</p>
+          <p className="text-xs text-muted-foreground mt-2">Current: {cpuCurrent}% | Average: {cpuAverage}%</p>
         </CardContent>
       </Card>
 
@@ -106,7 +135,7 @@ export function SystemMetrics() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">Current: 5.9 GB | Total: 16 GB</p>
+          <p className="text-xs text-muted-foreground mt-2">Current: {memoryCurrent} GB | Total: {memoryTotal} GB</p>
         </CardContent>
       </Card>
 
@@ -139,7 +168,7 @@ export function SystemMetrics() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">Current: 3,200 req/min | Peak: 3,800 req/min</p>
+          <p className="text-xs text-muted-foreground mt-2">Current: {requestsCurrent.toLocaleString()} processed | Peak: {requestsPeak.toLocaleString()} processed</p>
         </CardContent>
       </Card>
     </div>
