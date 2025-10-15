@@ -1,0 +1,37 @@
+services:
+  # Health Dashboard Service
+  backend:
+    container_name: dashboard_backend
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    environment:
+      - DASHBOARD_PORT=8090
+      - REFRESH_INTERVAL=30
+    ports:
+      - "8090:8090"
+    volumes:
+      - log_data:/app/logs
+    restart: unless-stopped
+    networks:
+      - batchsmart
+
+  frontend:
+    container_name: dashboard_frontend
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    working_dir: /client
+    volumes:
+      - ./client_data:/client
+    command: npm run dev
+    ports:
+      - "5173:5173"
+    networks:
+      - batchsmart
+
+volumes:
+  log_data:
+  client_data:
+networks:
+  batchsmart:

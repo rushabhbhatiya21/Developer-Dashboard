@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Dashboard - Live</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .connection-status {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .connection-status.connected {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+            border: 2px solid #4CAF50;
+        }
+
+        .connection-status.disconnected {
+            background: rgba(244, 67, 54, 0.2);
+            color: #F44336;
+            border: 2px solid #F44336;
+        }
+
+        .connection-status.connecting {
+            background: rgba(255, 193, 7, 0.2);
+            color: #FFC107;
+            border: 2px solid #FFC107;
+        }
+
+        .section-title {
+            color: white;
+            font-size: 1.5em;
+            margin: 30px 0 15px 0;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+
+        .summary-card h3 {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .summary-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .summary-card.healthy .value { color: #4CAF50; }
+        .summary-card.error .value { color: #F44336; }
+        .summary-card.warning .value { color: #FF9800; }
+
+        .resources-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .resource-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .resource-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: #ddd;
+            transition: all 0.3s ease;
+        }
+
+        .resource-card.healthy::before { background: #4CAF50; }
+        .resource-card.unhealthy::before { background: #F44336; }
+
+        .resource-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .resource-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            text-transform: capitalize;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.healthy {
+            background: #E8F5E8;
+            color: #4CAF50;
+        }
+
+        .status-badge.unhealthy {
+            background: #FFEBEE;
+            color: #F44336;
+        }
+
+        .resource-metrics {
+            display: grid;
+            gap: 10px;
+        }
+
+        .metrics-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .metrics-row:last-child {
+            border-bottom: none;
+        }
+
+        .metrics-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .metrics-value {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .response-time {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .response-time.good { background: #E8F5E8; color: #4CAF50; }
+        .response-time.moderate { background: #FFF3E0; color: #FF9800; }
+        .response-time.slow { background: #FFEBEE; color: #F44336; }
+
+        .workers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .worker-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .worker-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: #ddd;
+            transition: all 0.3s ease;
+        }
+
+        .worker-card.healthy::before { background: #4CAF50; }
+        .worker-card.unhealthy::before { background: #F44336; }
+        .worker-card.error::before { background: #FF5722; }
+
+        .worker-card.pulse {
+            animation: pulse 1s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        .worker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .worker-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .worker-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .info-item {
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 0.8em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .info-value {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .resource-usage {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .resource-item {
+            text-align: center;
+        }
+
+        .resource-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .resource-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease, background 0.3s ease;
+        }
+
+        .resource-fill.low { background: #4CAF50; }
+        .resource-fill.medium { background: #FF9800; }
+        .resource-fill.high { background: #F44336; }
+
+        .worker-metrics {
+            border-top: 1px solid #eee;
+            padding-top: 15px;
+            margin-top: 15px;
+        }
+
+        .last-update {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 10px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success { background: #4CAF50; }
+        .notification.error { background: #F44336; }
+        .notification.warning { background: #FF9800; }
+        .notification.info { background: #2196F3; }
+
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header h1 { font-size: 2em; }
+            .summary { grid-template-columns: repeat(2, 1fr); }
+            .resources-grid { grid-template-columns: 1fr; }
+            .workers-grid { grid-template-columns: 1fr; }
+            .worker-info { grid-template-columns: 1fr; }
+            .resource-usage { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Health Dashboard</h1>
+            <div class="connection-status" id="connectionStatus">
+                <span id="connectionText">Connecting...</span>
+            </div>
+        </div>
+
+        <div class="summary" id="summary">
+            <div class="summary-card">
+                <h3>Total Workers</h3>
+                <div class="value" id="totalWorkers">0</div>
+            </div>
+            <div class="summary-card healthy">
+                <h3>Healthy</h3>
+                <div class="value" id="healthyWorkers">0</div>
+            </div>
+            <div class="summary-card error">
+                <h3>Unhealthy</h3>
+                <div class="value" id="unhealthyWorkers">0</div>
+            </div>
+            <div class="summary-card">
+                <h3>Total Processed</h3>
+                <div class="value" id="totalProcessed">0</div>
+            </div>
+            <div class="summary-card warning">
+                <h3>Error Rate</h3>
+                <div class="value" id="errorRate">0%</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">Infrastructure Resources</h2>
+        <div class="resources-grid" id="resourcesGrid">
+            <!-- Resources will be populated here -->
+        </div>
+
+        <h2 class="section-title">Worker Health</h2>
+        <div class="workers-grid" id="workersGrid">
+            <!-- Workers will be populated here -->
+        </div>
+
+        <div class="last-update">
+            Last update: <span id="lastUpdate">Never</span>
+        </div>
+    </div>
+
+    <div class="notification" id="notification"></div>
+
+    <script>
+        class HealthDashboard {
+            constructor() {
+                this.eventSource = null;
+                this.reconnectDelay = 1000;
+                this.maxReconnectDelay = 30000;
+                this.workers = new Map();
+                this.resources = new Map();
+                this.init();
+            }
+
+            init() {
+                this.connectEventSource();
+                this.setupNotifications();
+            }
+
+            connectEventSource() {
+                const connectionStatus = document.getElementById('connectionStatus');
+                const connectionText = document.getElementById('connectionText');
+
+                connectionStatus.className = 'connection-status connecting';
+                connectionText.textContent = 'Connecting...';
+
+                try {
+                    this.eventSource = new EventSource('/events');
+
+                    this.eventSource.onopen = () => {
+                        console.log('SSE connection established');
+                        connectionStatus.className = 'connection-status connected';
+                        connectionText.textContent = 'Live';
+                        this.reconnectDelay = 1000;
+                        this.showNotification('Connected to live updates', 'success');
+                    };
+
+                    this.eventSource.onerror = (event) => {
+                        console.error('SSE connection error:', event);
+                        connectionStatus.className = 'connection-status disconnected';
+                        connectionText.textContent = 'Disconnected';
+
+                        this.eventSource.close();
+                        this.scheduleReconnect();
+                    };
+
+                    this.eventSource.addEventListener('initial_data', (event) => {
+                        const data = JSON.parse(event.data);
+                        this.updateDashboard(data);
+                    });
+
+                    this.eventSource.addEventListener('dashboard_update', (event) => {
+                        const data = JSON.parse(event.data);
+                        this.updateDashboard(data);
+                    });
+
+                    // this.eventSource.addEventListener('resource_health_update', (event) => {
+                    //     const data = JSON.parse(event.data);
+                    //     this.updateResources(data);
+                    // });
+
+                    this.eventSource.addEventListener('resources_update', (event) => {
+                        const data = JSON.parse(event.data);
+                        this.updateResources(data.resources);
+                    });
+
+                    this.eventSource.addEventListener('worker_registered', (event) => {
+                        const data = JSON.parse(event.data);
+                        this.showNotification(
+                            `Worker registered: ${data.worker_id}`,
+                            'success'
+                        );
+                    });
+
+                    this.eventSource.addEventListener('worker_deregistered', (event) => {
+                        const data = JSON.parse(event.data);
+                        this.showNotification(
+                            `Worker deregistered: ${data.worker_id}`,
+                            'warning'
+                        );
+                    });
+
+                    this.eventSource.addEventListener('worker_status_change', (event) => {
+                        const data = JSON.parse(event.data);
+                        this.handleWorkerStatusChange(data);
+                    });
+
+                    this.eventSource.addEventListener('worker_status_update', (event) => {
+                        const data = JSON.parse(event.data);
+                        this.showNotification(
+                            `${data.worker_id} status: ${data.status}`,
+                            'info'
+                        );
+                    });
+
+                    this.eventSource.addEventListener('metrics_update', (event) => {
+                        const data = JSON.parse(event.data);
+                        this.updateWorkerMetrics(data);
+                    });
+
+                } catch (error) {
+                    console.error('Failed to establish SSE connection:', error);
+                    this.scheduleReconnect();
+                }
+            }
+
+            scheduleReconnect() {
+                setTimeout(() => {
+                    console.log(`Attempting to reconnect in ${this.reconnectDelay}ms`);
+                    this.connectEventSource();
+                    this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+                }, this.reconnectDelay);
+            }
+
+            updateDashboard(data) {
+                this.updateSummary(data.summary);
+                this.updateWorkers(data.workers);
+                if (data.resources) {
+                    this.updateResources(data.resources);
+                }
+                document.getElementById('lastUpdate').textContent = data.last_update;
+            }
+
+            updateSummary(summary) {
+                document.getElementById('totalWorkers').textContent = summary.total_workers;
+                document.getElementById('healthyWorkers').textContent = summary.healthy_workers;
+                document.getElementById('unhealthyWorkers').textContent = summary.unhealthy_workers;
+                document.getElementById('totalProcessed').textContent = summary.total_processed.toLocaleString();
+                document.getElementById('errorRate').textContent = summary.overall_error_rate + '%';
+            }
+
+            updateResources(resources) {
+                const grid = document.getElementById('resourcesGrid');
+                grid.innerHTML = '';
+                this.resources.clear();
+
+                const resourceOrder = ['redis', 'rabbitmq', 'postgres', 'mongodb'];
+
+                resourceOrder.forEach(type => {
+                    if (resources[type]) {
+                        const card = this.createResourceCard(resources[type]);
+                        grid.appendChild(card);
+                        this.resources.set(type, resources[type]);
+                    }
+                });
+            }
+
+            createResourceCard(resource) {
+                const card = document.createElement('div');
+                const statusClass = resource.status === 'healthy' ? 'healthy' : 'unhealthy';
+
+                card.className = `resource-card ${statusClass}`;
+
+                let metricsHTML = '';
+                if (resource.status === 'healthy' && resource.metrics) {
+                    const responseClass = this.getResponseTimeClass(resource.response_time_ms);
+
+                    metricsHTML = `
+                        <div class="metrics-row">
+                            <span class="metrics-label">Response Time:</span>
+                            <span class="metrics-value">
+                                <span class="response-time ${responseClass}">${resource.response_time_ms}ms</span>
+                            </span>
+                        </div>
+                    `;
+
+                    // Type-specific metrics
+                    if (resource.type === 'redis') {
+                        metricsHTML += `
+                            <div class="metrics-row">
+                                <span class="metrics-label">Connected Clients:</span>
+                                <span class="metrics-value">${resource.metrics.connected_clients}</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Memory Used:</span>
+                                <span class="metrics-value">${resource.metrics.used_memory_mb} MB</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Commands Processed:</span>
+                                <span class="metrics-value">${resource.metrics.total_commands_processed.toLocaleString()}</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Uptime:</span>
+                                <span class="metrics-value">${this.formatUptime(resource.metrics.uptime_seconds)}</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Version:</span>
+                                <span class="metrics-value">${resource.metrics.version}</span>
+                            </div>
+                        `;
+                    } else if (resource.type === 'rabbitmq') {
+                        metricsHTML += `
+                            <div class="metrics-row">
+                                <span class="metrics-label">Connection:</span>
+                                <span class="metrics-value">${resource.metrics.connection_state}</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Connected:</span>
+                                <span class="metrics-value">${resource.metrics.is_connected ? 'Yes' : 'No'}</span>
+                            </div>
+                        `;
+                    } else if (resource.type === 'postgres') {
+                        metricsHTML += `
+                            <div class="metrics-row">
+                                <span class="metrics-label">Active Connections:</span>
+                                <span class="metrics-value">${resource.metrics.active_connections}</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Database Size:</span>
+                                <span class="metrics-value">${resource.metrics.database_size_mb} MB</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Version:</span>
+                                <span class="metrics-value">${resource.metrics.version}</span>
+                            </div>
+                        `;
+                    } else if (resource.type === 'mongodb') {
+                        metricsHTML += `
+                            <div class="metrics-row">
+                                <span class="metrics-label">Connections:</span>
+                                <span class="metrics-value">${resource.metrics.connections}</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Database Size:</span>
+                                <span class="metrics-value">${resource.metrics.database_size_mb} MB</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Collections:</span>
+                                <span class="metrics-value">${resource.metrics.collections}</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Uptime:</span>
+                                <span class="metrics-value">${this.formatUptime(resource.metrics.uptime_seconds)}</span>
+                            </div>
+                            <div class="metrics-row">
+                                <span class="metrics-label">Version:</span>
+                                <span class="metrics-value">${resource.metrics.version}</span>
+                            </div>
+                        `;
+                    }
+                } else if (resource.error) {
+                    metricsHTML = `
+                        <div class="metrics-row">
+                            <span class="metrics-label">Error:</span>
+                            <span class="metrics-value" style="color: #F44336;">${resource.error}</span>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="resource-header">
+                        <div class="resource-name">${resource.type}</div>
+                        <div class="status-badge ${statusClass}">
+                            ${resource.status}
+                        </div>
+                    </div>
+                    <div class="resource-metrics">
+                        ${metricsHTML}
+                        <div class="metrics-row">
+                            <span class="metrics-label">Last Check:</span>
+                            <span class="metrics-value">${new Date(resource.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                    </div>
+                `;
+
+                return card;
+            }
+
+            getResponseTimeClass(ms) {
+                if (ms < 50) return 'good';
+                if (ms < 200) return 'moderate';
+                return 'slow';
+            }
+
+            formatUptime(seconds) {
+                const days = Math.floor(seconds / 86400);
+                const hours = Math.floor((seconds % 86400) / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+
+                if (days > 0) return `${days}d ${hours}h`;
+                if (hours > 0) return `${hours}h ${mins}m`;
+                return `${mins}m`;
+            }
+
+            updateWorkers(workers) {
+                const grid = document.getElementById('workersGrid');
+                const existingWorkers = new Set(this.workers.keys());
+
+                grid.innerHTML = '';
+                this.workers.clear();
+
+                workers.forEach(worker => {
+                    const card = this.createWorkerCard(worker);
+                    grid.appendChild(card);
+                    this.workers.set(worker.name, worker);
+
+                    if (!existingWorkers.has(worker.name)) {
+                        card.classList.add('pulse');
+                        setTimeout(() => card.classList.remove('pulse'), 1000);
+                    }
+                });
+            }
+
+            getResourceClass(value) {
+                if (value < 50) return 'low';
+                if (value < 80) return 'medium';
+                return 'high';
+            }
+
+            createWorkerCard(worker) {
+                const card = document.createElement('div');
+                const statusClass = worker.healthy ? 'healthy' : (worker.status === 'error' ? 'error' : 'unhealthy');
+
+                const cpu = worker.cpu || 0;
+                const memory = worker.memory || 0;
+                const cpuClass = this.getResourceClass(cpu);
+                const memClass = this.getResourceClass(memory);
+
+                card.className = `worker-card ${statusClass}`;
+                card.innerHTML = `
+                    <div class="worker-header">
+                        <div class="worker-name">${worker.name}</div>
+                        <div class="status-badge ${statusClass}">
+                            ${worker.healthy ? 'Healthy' : 'Unhealthy'}
+                        </div>
+                    </div>
+
+                    <div class="worker-info">
+                        <div class="info-item">
+                            <div class="info-label">Status</div>
+                            <div class="info-value">${worker.worker_status}</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Container</div>
+                            <div class="info-value">${worker.container_id}</div>
+                        </div>
+                    </div>
+
+                    <div class="resource-usage">
+                        <div class="resource-item">
+                            <div class="info-label">CPU Usage</div>
+                            <div class="info-value">${cpu.toFixed(1)}%</div>
+                            <div class="resource-bar">
+                                <div class="resource-fill ${cpuClass}" style="width: ${cpu}%"></div>
+                            </div>
+                        </div>
+                        <div class="resource-item">
+                            <div class="info-label">Memory Usage</div>
+                            <div class="info-value">${memory.toFixed(1)}%</div>
+                            <div class="resource-bar">
+                                <div class="resource-fill ${memClass}" style="width: ${memory}%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="worker-metrics">
+                        <div class="metrics-row">
+                            <span class="metrics-label">Processed:</span>
+                            <span class="metrics-value">${worker.total_processed.toLocaleString()}</span>
+                        </div>
+                        <div class="metrics-row">
+                            <span class="metrics-label">Errors:</span>
+                            <span class="metrics-value">${worker.error_count}</span>
+                        </div>
+                        <div class="metrics-row">
+                            <span class="metrics-label">Error Rate:</span>
+                            <span class="metrics-value">${worker.error_rate.toFixed(2)}%</span>
+                        </div>
+                        <div class="metrics-row">
+                            <span class="metrics-label">Last Check:</span>
+                            <span class="metrics-value">${new Date(worker.last_checked).toLocaleTimeString()}</span>
+                        </div>
+                        ${worker.error_message ? `
+                        <div class="metrics-row">
+                            <span class="metrics-label">Error:</span>
+                            <span class="metrics-value" style="color: #F44336;">${worker.error_message}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                return card;
+            }
+
+            handleWorkerStatusChange(data) {
+                const worker = data.worker;
+                const previous = data.previous;
+
+                let message = `${worker.name}: ${previous.worker_status} → ${worker.worker_status}`;
+                let type = 'info';
+
+                if (worker.healthy !== previous.healthy) {
+                    message += worker.healthy ? ' (Now Healthy)' : ' (Now Unhealthy)';
+                    type = worker.healthy ? 'success' : 'error';
+                }
+
+                this.showNotification(message, type);
+            }
+
+            setupNotifications() {
+                this.notificationTimeout = null;
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.getElementById('notification');
+
+                if (this.notificationTimeout) {
+                    clearTimeout(this.notificationTimeout);
+                }
+
+                notification.textContent = message;
+                notification.className = `notification ${type} show`;
+
+                this.notificationTimeout = setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 5000);
+            }
+
+            updateWorkerMetrics(data) {
+                const workerName = data.worker_name;
+                const metrics = data.metrics;
+
+                const workerCards = document.querySelectorAll('.worker-card');
+
+                workerCards.forEach(card => {
+                    const nameElement = card.querySelector('.worker-name');
+                    if (nameElement && nameElement.textContent === workerName) {
+                        const cpuValue = card.querySelector('.resource-item:nth-child(1) .info-value');
+                        const cpuBar = card.querySelector('.resource-item:nth-child(1) .resource-fill');
+                        if (cpuValue && cpuBar) {
+                            const cpu = metrics.cpu || 0;
+                            cpuValue.textContent = `${cpu.toFixed(1)}%`;
+                            cpuBar.style.width = `${cpu}%`;
+                            cpuBar.className = `resource-fill ${this.getResourceClass(cpu)}`;
+                        }
+
+                        const memValue = card.querySelector('.resource-item:nth-child(2) .info-value');
+                        const memBar = card.querySelector('.resource-item:nth-child(2) .resource-fill');
+                        if (memValue && memBar) {
+                            const mem = metrics.memory || 0;
+                            memValue.textContent = `${mem.toFixed(1)}%`;
+                            memBar.style.width = `${mem}%`;
+                            memBar.className = `resource-fill ${this.getResourceClass(mem)}`;
+                        }
+
+                        const metricsRows = card.querySelectorAll('.metrics-row');
+                        metricsRows.forEach(row => {
+                            const label = row.querySelector('.metrics-label').textContent;
+                            const valueElement = row.querySelector('.metrics-value');
+
+                            if (label.includes('Processed') && valueElement) {
+                                valueElement.textContent = metrics.total_processed.toLocaleString();
+                            } else if (label.includes('Errors:') && valueElement) {
+                                valueElement.textContent = metrics.error_count;
+                            } else if (label.includes('Error Rate') && valueElement) {
+                                valueElement.textContent = `${metrics.error_rate.toFixed(2)}%`;
+                            } else if (label.includes('Last Check') && valueElement) {
+                                valueElement.textContent = new Date().toLocaleTimeString();
+                            }
+                        });
+
+                        const statusValue = card.querySelector('.worker-info .info-item:nth-child(1) .info-value');
+                        if (statusValue && metrics.worker_status) {
+                            statusValue.textContent = metrics.worker_status;
+                        }
+                    }
+                });
+
+                const cachedWorker = this.workers.get(workerName);
+                if (cachedWorker) {
+                    cachedWorker.cpu = metrics.cpu;
+                    cachedWorker.memory = metrics.memory;
+                    cachedWorker.total_processed = metrics.total_processed;
+                    cachedWorker.error_count = metrics.error_count;
+                    cachedWorker.error_rate = metrics.error_rate;
+                    cachedWorker.worker_status = metrics.worker_status;
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new HealthDashboard();
+        });
+    </script>
+</body>
+</html>
+
+<!--<!DOCTYPE html>-->
+<!--<html lang="en">-->
+<!--<head>-->
+<!--    <meta charset="UTF-8">-->
+<!--    <meta name="viewport" content="width=device-width, initial-scale=1.0">-->
+<!--    <title>Health Dashboard - Live</title>-->
+<!--    <style>-->
+<!--        * {-->
+<!--            margin: 0;-->
+<!--            padding: 0;-->
+<!--            box-sizing: border-box;-->
+<!--        }-->
+
+<!--        body {-->
+<!--            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;-->
+<!--            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);-->
+<!--            min-height: 100vh;-->
+<!--            color: #333;-->
+<!--        }-->
+
+<!--        .container {-->
+<!--            max-width: 1400px;-->
+<!--            margin: 0 auto;-->
+<!--            padding: 20px;-->
+<!--        }-->
+
+<!--        .header {-->
+<!--            text-align: center;-->
+<!--            margin-bottom: 30px;-->
+<!--            color: white;-->
+<!--        }-->
+
+<!--        .header h1 {-->
+<!--            font-size: 2.5em;-->
+<!--            margin-bottom: 10px;-->
+<!--            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);-->
+<!--        }-->
+
+<!--        .connection-status {-->
+<!--            display: inline-block;-->
+<!--            padding: 5px 15px;-->
+<!--            border-radius: 20px;-->
+<!--            font-size: 0.9em;-->
+<!--            font-weight: bold;-->
+<!--            margin-top: 10px;-->
+<!--            transition: all 0.3s ease;-->
+<!--        }-->
+
+<!--        .connection-status.connected {-->
+<!--            background: rgba(76, 175, 80, 0.2);-->
+<!--            color: #4CAF50;-->
+<!--            border: 2px solid #4CAF50;-->
+<!--        }-->
+
+<!--        .connection-status.disconnected {-->
+<!--            background: rgba(244, 67, 54, 0.2);-->
+<!--            color: #F44336;-->
+<!--            border: 2px solid #F44336;-->
+<!--        }-->
+
+<!--        .connection-status.connecting {-->
+<!--            background: rgba(255, 193, 7, 0.2);-->
+<!--            color: #FFC107;-->
+<!--            border: 2px solid #FFC107;-->
+<!--        }-->
+
+<!--        .summary {-->
+<!--            display: grid;-->
+<!--            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));-->
+<!--            gap: 20px;-->
+<!--            margin-bottom: 30px;-->
+<!--        }-->
+
+<!--        .summary-card {-->
+<!--            background: rgba(255, 255, 255, 0.95);-->
+<!--            padding: 20px;-->
+<!--            border-radius: 15px;-->
+<!--            box-shadow: 0 8px 32px rgba(0,0,0,0.1);-->
+<!--            backdrop-filter: blur(10px);-->
+<!--            border: 1px solid rgba(255, 255, 255, 0.2);-->
+<!--            transition: all 0.3s ease;-->
+<!--        }-->
+
+<!--        .summary-card:hover {-->
+<!--            transform: translateY(-5px);-->
+<!--            box-shadow: 0 12px 40px rgba(0,0,0,0.15);-->
+<!--        }-->
+
+<!--        .summary-card h3 {-->
+<!--            color: #666;-->
+<!--            font-size: 0.9em;-->
+<!--            text-transform: uppercase;-->
+<!--            letter-spacing: 1px;-->
+<!--            margin-bottom: 10px;-->
+<!--        }-->
+
+<!--        .summary-card .value {-->
+<!--            font-size: 2em;-->
+<!--            font-weight: bold;-->
+<!--            color: #333;-->
+<!--        }-->
+
+<!--        .summary-card.healthy .value { color: #4CAF50; }-->
+<!--        .summary-card.error .value { color: #F44336; }-->
+<!--        .summary-card.warning .value { color: #FF9800; }-->
+
+<!--        .workers-grid {-->
+<!--            display: grid;-->
+<!--            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));-->
+<!--            gap: 20px;-->
+<!--        }-->
+
+<!--        .worker-card {-->
+<!--            background: rgba(255, 255, 255, 0.95);-->
+<!--            border-radius: 15px;-->
+<!--            padding: 25px;-->
+<!--            box-shadow: 0 8px 32px rgba(0,0,0,0.1);-->
+<!--            backdrop-filter: blur(10px);-->
+<!--            border: 1px solid rgba(255, 255, 255, 0.2);-->
+<!--            transition: all 0.3s ease;-->
+<!--            position: relative;-->
+<!--            overflow: hidden;-->
+<!--        }-->
+
+<!--        .worker-card::before {-->
+<!--            content: '';-->
+<!--            position: absolute;-->
+<!--            top: 0;-->
+<!--            left: 0;-->
+<!--            right: 0;-->
+<!--            height: 4px;-->
+<!--            background: #ddd;-->
+<!--            transition: all 0.3s ease;-->
+<!--        }-->
+
+<!--        .worker-card.healthy::before { background: #4CAF50; }-->
+<!--        .worker-card.unhealthy::before { background: #F44336; }-->
+<!--        .worker-card.error::before { background: #FF5722; }-->
+
+<!--        .worker-card.pulse {-->
+<!--            animation: pulse 1s ease-in-out;-->
+<!--        }-->
+
+<!--        @keyframes pulse {-->
+<!--            0% { transform: scale(1); }-->
+<!--            50% { transform: scale(1.02); }-->
+<!--            100% { transform: scale(1); }-->
+<!--        }-->
+
+<!--        .worker-header {-->
+<!--            display: flex;-->
+<!--            justify-content: space-between;-->
+<!--            align-items: center;-->
+<!--            margin-bottom: 20px;-->
+<!--        }-->
+
+<!--        .worker-name {-->
+<!--            font-size: 1.3em;-->
+<!--            font-weight: bold;-->
+<!--            color: #333;-->
+<!--        }-->
+
+<!--        .status-badge {-->
+<!--            padding: 6px 12px;-->
+<!--            border-radius: 20px;-->
+<!--            font-size: 0.8em;-->
+<!--            font-weight: bold;-->
+<!--            text-transform: uppercase;-->
+<!--            letter-spacing: 0.5px;-->
+<!--        }-->
+
+<!--        .status-badge.healthy {-->
+<!--            background: #E8F5E8;-->
+<!--            color: #4CAF50;-->
+<!--        }-->
+
+<!--        .status-badge.unhealthy {-->
+<!--            background: #FFEBEE;-->
+<!--            color: #F44336;-->
+<!--        }-->
+
+<!--        .status-badge.error {-->
+<!--            background: #FFF3E0;-->
+<!--            color: #FF5722;-->
+<!--        }-->
+
+<!--        .worker-info {-->
+<!--            display: grid;-->
+<!--            grid-template-columns: 1fr 1fr;-->
+<!--            gap: 15px;-->
+<!--            margin-bottom: 15px;-->
+<!--        }-->
+
+<!--        .info-item {-->
+<!--            text-align: center;-->
+<!--        }-->
+
+<!--        .info-label {-->
+<!--            font-size: 0.8em;-->
+<!--            color: #666;-->
+<!--            text-transform: uppercase;-->
+<!--            letter-spacing: 0.5px;-->
+<!--            margin-bottom: 5px;-->
+<!--        }-->
+
+<!--        .info-value {-->
+<!--            font-size: 1.1em;-->
+<!--            font-weight: bold;-->
+<!--            color: #333;-->
+<!--        }-->
+
+<!--        .resource-usage {-->
+<!--            display: grid;-->
+<!--            grid-template-columns: 1fr 1fr;-->
+<!--            gap: 15px;-->
+<!--            margin-bottom: 15px;-->
+<!--            padding: 15px;-->
+<!--            background: #f8f9fa;-->
+<!--            border-radius: 10px;-->
+<!--        }-->
+
+<!--        .resource-item {-->
+<!--            text-align: center;-->
+<!--        }-->
+
+<!--        .resource-bar {-->
+<!--            width: 100%;-->
+<!--            height: 8px;-->
+<!--            background: #e0e0e0;-->
+<!--            border-radius: 4px;-->
+<!--            overflow: hidden;-->
+<!--            margin-top: 8px;-->
+<!--        }-->
+
+<!--        .resource-fill {-->
+<!--            height: 100%;-->
+<!--            border-radius: 4px;-->
+<!--            transition: width 0.3s ease, background 0.3s ease;-->
+<!--        }-->
+
+<!--        .resource-fill.low { background: #4CAF50; }-->
+<!--        .resource-fill.medium { background: #FF9800; }-->
+<!--        .resource-fill.high { background: #F44336; }-->
+
+<!--        .worker-metrics {-->
+<!--            border-top: 1px solid #eee;-->
+<!--            padding-top: 15px;-->
+<!--            margin-top: 15px;-->
+<!--        }-->
+
+<!--        .metrics-row {-->
+<!--            display: flex;-->
+<!--            justify-content: space-between;-->
+<!--            margin-bottom: 8px;-->
+<!--        }-->
+
+<!--        .metrics-label {-->
+<!--            color: #666;-->
+<!--            font-size: 0.9em;-->
+<!--        }-->
+
+<!--        .metrics-value {-->
+<!--            font-weight: bold;-->
+<!--            color: #333;-->
+<!--        }-->
+
+<!--        .last-update {-->
+<!--            text-align: center;-->
+<!--            color: rgba(255, 255, 255, 0.8);-->
+<!--            margin-top: 20px;-->
+<!--            font-size: 0.9em;-->
+<!--        }-->
+
+<!--        .notification {-->
+<!--            position: fixed;-->
+<!--            top: 20px;-->
+<!--            right: 20px;-->
+<!--            padding: 15px 20px;-->
+<!--            border-radius: 10px;-->
+<!--            color: white;-->
+<!--            font-weight: bold;-->
+<!--            z-index: 1000;-->
+<!--            transform: translateX(400px);-->
+<!--            transition: transform 0.3s ease;-->
+<!--        }-->
+
+<!--        .notification.show {-->
+<!--            transform: translateX(0);-->
+<!--        }-->
+
+<!--        .notification.success { background: #4CAF50; }-->
+<!--        .notification.error { background: #F44336; }-->
+<!--        .notification.warning { background: #FF9800; }-->
+<!--        .notification.info { background: #2196F3; }-->
+
+<!--        @media (max-width: 768px) {-->
+<!--            .container { padding: 10px; }-->
+<!--            .header h1 { font-size: 2em; }-->
+<!--            .summary { grid-template-columns: repeat(2, 1fr); }-->
+<!--            .workers-grid { grid-template-columns: 1fr; }-->
+<!--            .worker-info { grid-template-columns: 1fr; }-->
+<!--            .resource-usage { grid-template-columns: 1fr; }-->
+<!--        }-->
+<!--    </style>-->
+<!--</head>-->
+<!--<body>-->
+<!--    <div class="container">-->
+<!--        <div class="header">-->
+<!--            <h1>Health Dashboard</h1>-->
+<!--            <div class="connection-status" id="connectionStatus">-->
+<!--                <span id="connectionText">Connecting...</span>-->
+<!--            </div>-->
+<!--        </div>-->
+
+<!--        <div class="summary" id="summary">-->
+<!--            <div class="summary-card">-->
+<!--                <h3>Total Workers</h3>-->
+<!--                <div class="value" id="totalWorkers">0</div>-->
+<!--            </div>-->
+<!--            <div class="summary-card healthy">-->
+<!--                <h3>Healthy</h3>-->
+<!--                <div class="value" id="healthyWorkers">0</div>-->
+<!--            </div>-->
+<!--            <div class="summary-card error">-->
+<!--                <h3>Unhealthy</h3>-->
+<!--                <div class="value" id="unhealthyWorkers">0</div>-->
+<!--            </div>-->
+<!--            <div class="summary-card">-->
+<!--                <h3>Total Processed</h3>-->
+<!--                <div class="value" id="totalProcessed">0</div>-->
+<!--            </div>-->
+<!--            <div class="summary-card warning">-->
+<!--                <h3>Error Rate</h3>-->
+<!--                <div class="value" id="errorRate">0%</div>-->
+<!--            </div>-->
+<!--        </div>-->
+
+<!--        <div class="workers-grid" id="workersGrid">-->
+<!--            &lt;!&ndash; Workers will be populated here &ndash;&gt;-->
+<!--        </div>-->
+
+<!--        <div class="last-update">-->
+<!--            Last update: <span id="lastUpdate">Never</span>-->
+<!--        </div>-->
+<!--    </div>-->
+
+<!--    <div class="notification" id="notification"></div>-->
+
+<!--    <script>-->
+<!--        class HealthDashboard {-->
+<!--            constructor() {-->
+<!--                this.eventSource = null;-->
+<!--                this.reconnectDelay = 1000;-->
+<!--                this.maxReconnectDelay = 30000;-->
+<!--                this.workers = new Map();-->
+<!--                this.init();-->
+<!--            }-->
+
+<!--            init() {-->
+<!--                this.connectEventSource();-->
+<!--                this.setupNotifications();-->
+<!--            }-->
+
+<!--            connectEventSource() {-->
+<!--                const connectionStatus = document.getElementById('connectionStatus');-->
+<!--                const connectionText = document.getElementById('connectionText');-->
+
+<!--                connectionStatus.className = 'connection-status connecting';-->
+<!--                connectionText.textContent = 'Connecting...';-->
+
+<!--                try {-->
+<!--                    this.eventSource = new EventSource('/events');-->
+
+<!--                    this.eventSource.onopen = () => {-->
+<!--                        console.log('SSE connection established');-->
+<!--                        connectionStatus.className = 'connection-status connected';-->
+<!--                        connectionText.textContent = 'Live';-->
+<!--                        this.reconnectDelay = 1000;-->
+<!--                        this.showNotification('Connected to live updates', 'success');-->
+<!--                    };-->
+
+<!--                    this.eventSource.onerror = (event) => {-->
+<!--                        console.error('SSE connection error:', event);-->
+<!--                        connectionStatus.className = 'connection-status disconnected';-->
+<!--                        connectionText.textContent = 'Disconnected';-->
+
+<!--                        this.eventSource.close();-->
+<!--                        this.scheduleReconnect();-->
+<!--                    };-->
+
+<!--                    this.eventSource.addEventListener('initial_data', (event) => {-->
+<!--                        const data = JSON.parse(event.data);-->
+<!--                        this.updateDashboard(data);-->
+<!--                    });-->
+
+<!--                    this.eventSource.addEventListener('dashboard_update', (event) => {-->
+<!--                        const data = JSON.parse(event.data);-->
+<!--                        this.updateDashboard(data);-->
+<!--                    });-->
+
+<!--                    this.eventSource.addEventListener('worker_registered', (event) => {-->
+<!--                        const data = JSON.parse(event.data);-->
+<!--                        this.showNotification(-->
+<!--                            `Worker registered: ${data.worker_id}`,-->
+<!--                            'success'-->
+<!--                        );-->
+<!--                    });-->
+
+<!--                    this.eventSource.addEventListener('worker_deregistered', (event) => {-->
+<!--                        const data = JSON.parse(event.data);-->
+<!--                        this.showNotification(-->
+<!--                            `Worker deregistered: ${data.worker_id}`,-->
+<!--                            'warning'-->
+<!--                        );-->
+<!--                    });-->
+
+<!--                    this.eventSource.addEventListener('worker_status_change', (event) => {-->
+<!--                        const data = JSON.parse(event.data);-->
+<!--                        this.handleWorkerStatusChange(data);-->
+<!--                    });-->
+
+<!--                    this.eventSource.addEventListener('worker_status_update', (event) => {-->
+<!--                        const data = JSON.parse(event.data);-->
+<!--                        this.showNotification(-->
+<!--                            `${data.worker_id} status: ${data.status}`,-->
+<!--                            'info'-->
+<!--                        );-->
+<!--                    });-->
+
+<!--                    this.eventSource.addEventListener('metrics_update', (event) => {-->
+<!--                        const data = JSON.parse(event.data);-->
+<!--                        this.updateWorkerMetrics(data);-->
+<!--                    });-->
+
+<!--                } catch (error) {-->
+<!--                    console.error('Failed to establish SSE connection:', error);-->
+<!--                    this.scheduleReconnect();-->
+<!--                }-->
+<!--            }-->
+
+<!--            scheduleReconnect() {-->
+<!--                setTimeout(() => {-->
+<!--                    console.log(`Attempting to reconnect in ${this.reconnectDelay}ms`);-->
+<!--                    this.connectEventSource();-->
+<!--                    this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);-->
+<!--                }, this.reconnectDelay);-->
+<!--            }-->
+
+<!--            updateDashboard(data) {-->
+<!--                this.updateSummary(data.summary);-->
+<!--                this.updateWorkers(data.workers);-->
+<!--                document.getElementById('lastUpdate').textContent = data.last_update;-->
+<!--            }-->
+
+<!--            updateSummary(summary) {-->
+<!--                document.getElementById('totalWorkers').textContent = summary.total_workers;-->
+<!--                document.getElementById('healthyWorkers').textContent = summary.healthy_workers;-->
+<!--                document.getElementById('unhealthyWorkers').textContent = summary.unhealthy_workers;-->
+<!--                document.getElementById('totalProcessed').textContent = summary.total_processed.toLocaleString();-->
+<!--                document.getElementById('errorRate').textContent = summary.overall_error_rate + '%';-->
+<!--            }-->
+
+<!--            updateWorkers(workers) {-->
+<!--                const grid = document.getElementById('workersGrid');-->
+<!--                const existingWorkers = new Set(this.workers.keys());-->
+
+<!--                grid.innerHTML = '';-->
+<!--                this.workers.clear();-->
+
+<!--                workers.forEach(worker => {-->
+<!--                    const card = this.createWorkerCard(worker);-->
+<!--                    grid.appendChild(card);-->
+<!--                    this.workers.set(worker.name, worker);-->
+
+<!--                    if (!existingWorkers.has(worker.name)) {-->
+<!--                        card.classList.add('pulse');-->
+<!--                        setTimeout(() => card.classList.remove('pulse'), 1000);-->
+<!--                    }-->
+<!--                });-->
+<!--            }-->
+
+<!--            getResourceClass(value) {-->
+<!--                if (value < 50) return 'low';-->
+<!--                if (value < 80) return 'medium';-->
+<!--                return 'high';-->
+<!--            }-->
+
+<!--            createWorkerCard(worker) {-->
+<!--                const card = document.createElement('div');-->
+<!--                const statusClass = worker.healthy ? 'healthy' : (worker.status === 'error' ? 'error' : 'unhealthy');-->
+
+<!--                const cpu = worker.cpu || 0;-->
+<!--                const memory = worker.memory || 0;-->
+<!--                const cpuClass = this.getResourceClass(cpu);-->
+<!--                const memClass = this.getResourceClass(memory);-->
+
+<!--                card.className = `worker-card ${statusClass}`;-->
+<!--                card.innerHTML = `-->
+<!--                    <div class="worker-header">-->
+<!--                        <div class="worker-name">${worker.name}</div>-->
+<!--                        <div class="status-badge ${statusClass}">-->
+<!--                            ${worker.healthy ? 'Healthy' : 'Unhealthy'}-->
+<!--                        </div>-->
+<!--                    </div>-->
+
+<!--                    <div class="worker-info">-->
+<!--                        <div class="info-item">-->
+<!--                            <div class="info-label">Status</div>-->
+<!--                            <div class="info-value">${worker.worker_status}</div>-->
+<!--                        </div>-->
+<!--                        <div class="info-item">-->
+<!--                            <div class="info-label">Container</div>-->
+<!--                            <div class="info-value">${worker.container_id}</div>-->
+<!--                        </div>-->
+<!--                    </div>-->
+
+<!--                    <div class="resource-usage">-->
+<!--                        <div class="resource-item">-->
+<!--                            <div class="info-label">CPU Usage</div>-->
+<!--                            <div class="info-value">${cpu.toFixed(1)}%</div>-->
+<!--                            <div class="resource-bar">-->
+<!--                                <div class="resource-fill ${cpuClass}" style="width: ${cpu}%"></div>-->
+<!--                            </div>-->
+<!--                        </div>-->
+<!--                        <div class="resource-item">-->
+<!--                            <div class="info-label">Memory Usage</div>-->
+<!--                            <div class="info-value">${memory.toFixed(1)}%</div>-->
+<!--                            <div class="resource-bar">-->
+<!--                                <div class="resource-fill ${memClass}" style="width: ${memory}%"></div>-->
+<!--                            </div>-->
+<!--                        </div>-->
+<!--                    </div>-->
+
+<!--                    <div class="worker-metrics">-->
+<!--                        <div class="metrics-row">-->
+<!--                            <span class="metrics-label">Processed:</span>-->
+<!--                            <span class="metrics-value">${worker.total_processed.toLocaleString()}</span>-->
+<!--                        </div>-->
+<!--                        <div class="metrics-row">-->
+<!--                            <span class="metrics-label">Errors:</span>-->
+<!--                            <span class="metrics-value">${worker.error_count}</span>-->
+<!--                        </div>-->
+<!--                        <div class="metrics-row">-->
+<!--                            <span class="metrics-label">Error Rate:</span>-->
+<!--                            <span class="metrics-value">${worker.error_rate.toFixed(2)}%</span>-->
+<!--                        </div>-->
+<!--                        <div class="metrics-row">-->
+<!--                            <span class="metrics-label">Last Check:</span>-->
+<!--                            <span class="metrics-value">${new Date(worker.last_checked).toLocaleTimeString()}</span>-->
+<!--                        </div>-->
+<!--                        ${worker.error_message ? `-->
+<!--                        <div class="metrics-row">-->
+<!--                            <span class="metrics-label">Error:</span>-->
+<!--                            <span class="metrics-value" style="color: #F44336;">${worker.error_message}</span>-->
+<!--                        </div>-->
+<!--                        ` : ''}-->
+<!--                    </div>-->
+<!--                `;-->
+
+<!--                return card;-->
+<!--            }-->
+
+<!--            handleWorkerStatusChange(data) {-->
+<!--                const worker = data.worker;-->
+<!--                const previous = data.previous;-->
+
+<!--                let message = `${worker.name}: ${previous.worker_status} → ${worker.worker_status}`;-->
+<!--                let type = 'info';-->
+
+<!--                if (worker.healthy !== previous.healthy) {-->
+<!--                    message += worker.healthy ? ' (Now Healthy)' : ' (Now Unhealthy)';-->
+<!--                    type = worker.healthy ? 'success' : 'error';-->
+<!--                }-->
+
+<!--                this.showNotification(message, type);-->
+<!--            }-->
+
+<!--            setupNotifications() {-->
+<!--                this.notificationTimeout = null;-->
+<!--            }-->
+
+<!--            showNotification(message, type = 'info') {-->
+<!--                const notification = document.getElementById('notification');-->
+
+<!--                if (this.notificationTimeout) {-->
+<!--                    clearTimeout(this.notificationTimeout);-->
+<!--                }-->
+
+<!--                notification.textContent = message;-->
+<!--                notification.className = `notification ${type} show`;-->
+
+<!--                this.notificationTimeout = setTimeout(() => {-->
+<!--                    notification.classList.remove('show');-->
+<!--                }, 5000);-->
+<!--            }-->
+
+<!--            updateWorkerMetrics(data) {-->
+<!--                const workerName = data.worker_name;-->
+<!--                const metrics = data.metrics;-->
+
+<!--                // Find the worker card in the DOM-->
+<!--                const workerCards = document.querySelectorAll('.worker-card');-->
+
+<!--                workerCards.forEach(card => {-->
+<!--                    const nameElement = card.querySelector('.worker-name');-->
+<!--                    if (nameElement && nameElement.textContent === workerName) {-->
+<!--                        // Update CPU-->
+<!--                        const cpuValue = card.querySelector('.resource-item:nth-child(1) .info-value');-->
+<!--                        const cpuBar = card.querySelector('.resource-item:nth-child(1) .resource-fill');-->
+<!--                        if (cpuValue && cpuBar) {-->
+<!--                            const cpu = metrics.cpu || 0;-->
+<!--                            cpuValue.textContent = `${cpu.toFixed(1)}%`;-->
+<!--                            cpuBar.style.width = `${cpu}%`;-->
+<!--                            cpuBar.className = `resource-fill ${this.getResourceClass(cpu)}`;-->
+<!--                        }-->
+
+<!--                        // Update Memory-->
+<!--                        const memValue = card.querySelector('.resource-item:nth-child(2) .info-value');-->
+<!--                        const memBar = card.querySelector('.resource-item:nth-child(2) .resource-fill');-->
+<!--                        if (memValue && memBar) {-->
+<!--                            const mem = metrics.memory || 0;-->
+<!--                            memValue.textContent = `${mem.toFixed(1)}%`;-->
+<!--                            memBar.style.width = `${mem}%`;-->
+<!--                            memBar.className = `resource-fill ${this.getResourceClass(mem)}`;-->
+<!--                        }-->
+
+<!--                        // Update other metrics-->
+<!--                        const metricsRows = card.querySelectorAll('.metrics-row');-->
+<!--                        metricsRows.forEach(row => {-->
+<!--                            const label = row.querySelector('.metrics-label').textContent;-->
+<!--                            const valueElement = row.querySelector('.metrics-value');-->
+
+<!--                            if (label.includes('Processed') && valueElement) {-->
+<!--                                valueElement.textContent = metrics.total_processed.toLocaleString();-->
+<!--                            } else if (label.includes('Errors:') && valueElement) {-->
+<!--                                valueElement.textContent = metrics.error_count;-->
+<!--                            } else if (label.includes('Error Rate') && valueElement) {-->
+<!--                                valueElement.textContent = `${metrics.error_rate.toFixed(2)}%`;-->
+<!--                            } else if (label.includes('Last Check') && valueElement) {-->
+<!--                                valueElement.textContent = new Date().toLocaleTimeString();-->
+<!--                            }-->
+<!--                        });-->
+
+<!--                        // Update status if changed-->
+<!--                        const statusValue = card.querySelector('.worker-info .info-item:nth-child(1) .info-value');-->
+<!--                        if (statusValue && metrics.worker_status) {-->
+<!--                            statusValue.textContent = metrics.worker_status;-->
+<!--                        }-->
+<!--                    }-->
+<!--                });-->
+
+<!--                // Also update cached worker data-->
+<!--                const cachedWorker = this.workers.get(workerName);-->
+<!--                if (cachedWorker) {-->
+<!--                    cachedWorker.cpu = metrics.cpu;-->
+<!--                    cachedWorker.memory = metrics.memory;-->
+<!--                    cachedWorker.total_processed = metrics.total_processed;-->
+<!--                    cachedWorker.error_count = metrics.error_count;-->
+<!--                    cachedWorker.error_rate = metrics.error_rate;-->
+<!--                    cachedWorker.worker_status = metrics.worker_status;-->
+<!--                }-->
+<!--            }-->
+<!--        }-->
+
+<!--        document.addEventListener('DOMContentLoaded', () => {-->
+<!--            new HealthDashboard();-->
+<!--        });-->
+<!--    </script>-->
+<!--</body>-->
+<!--</html>-->
