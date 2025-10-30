@@ -36,6 +36,6 @@ services:
 
 volumes:
   log_data:
-  client_data:
+
 networks:
   batchsmart:
