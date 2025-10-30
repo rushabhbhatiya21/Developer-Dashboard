@@ -222,9 +222,24 @@ export function LogsView() {
               <RefreshCw className="size-4 mr-2" />
               Refresh
             </Button>
-            <Button variant="outline" size="sm">
-              <Download className="size-4 mr-2" />
-              Export
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportLogs}
+              disabled={!isConnected || isExporting}
+              title={!isConnected ? 'Connect to server to export' : 'Export logs as JSON'}
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="size-4 mr-2" />
+                  Export
+                </>
+              )}
             </Button>
           </div>
         </div>
