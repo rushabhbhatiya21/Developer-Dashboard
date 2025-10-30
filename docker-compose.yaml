@@ -21,14 +21,18 @@ services:
     build:
       context: frontend
       dockerfile: Dockerfile
-    working_dir: /client
+      target: development
+    environment:
+      - VITE_BACKEND_URL=http://backend:8090
     volumes:
-      - ./client_data:/client
-    command: npm run dev
+      - ./frontend:/frontend
+      - /frontend/node_modules
     ports:
       - "5173:5173"
     networks:
       - batchsmart
+    depends_on:
+      - backend
 
 volumes:
   log_data:
