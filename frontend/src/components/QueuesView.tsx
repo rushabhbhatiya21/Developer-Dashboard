@@ -79,6 +79,7 @@ function getStatusIcon(status: string) {
 export function QueuesView() {
   const [queues, setQueues] = useState<QueueDetail[]>(defaultQueues);
   const [isConnected, setIsConnected] = useState(false);
+  const [deletingQueues, setDeletingQueues] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     socketService.connect();
