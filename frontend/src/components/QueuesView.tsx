@@ -92,6 +92,10 @@ export function QueuesView() {
       setIsConnected(false);
     });
 
+    const unsubscribeClosed = socketService.subscribe('connection_closed', () => {
+      setIsConnected(false);
+    });
+
     const unsubscribeInitial = socketService.subscribe('initial_data', (data) => {
       updateQueuesFromData(data);
     });
@@ -100,11 +104,39 @@ export function QueuesView() {
       updateQueuesFromData(data);
     });
 
+    // Subscribe to command responses for delete operations
+    const unsubscribeResponse = socketService.subscribe('command_response', (message) => {
+      const { payload } = message;
+
+      if (payload.command === 'dlq:clear') {
+        const queueName = payload.queue_name;
+
+        // Remove queue from deleting state
+        setDeletingQueues(prev => {
+          const next = new Set(prev);
+          next.delete(queueName);
+          return next;
+        });
+
+        if (payload.success) {
+          console.log(`DLQ ${queueName} cleared successfully:`, payload);
+          alert(`Successfully deleted ${payload.messages_deleted || 0} messages from ${queueName}`);
+          // Refresh data after successful delete
+          handleRefresh();
+        } else {
+          console.error(`Failed to clear DLQ ${queueName}:`, payload.error);
+          alert(`Error deleting DLQ: ${payload.error}`);
+        }
+      }
+    });
+
     return () => {
       unsubscribeOpen();
       unsubscribeError();
+      unsubscribeClosed();
       unsubscribeInitial();
       unsubscribeUpdate();
+      unsubscribeResponse();
     };
   }, []);
 
