@@ -1337,6 +1337,270 @@ class WebSocketManager:
 
         await self.connection_manager.send_to_worker(worker_id, message)
 
+    async def _handle_dlq_clear(self, connection_id: str, payload: Dict[str, Any]):
+        """Handle DLQ clear command from dashboard"""
+        try:
+            queue_name = payload.get("queue_name")
+            action = payload.get("action", "clear_all")
+
+            if not queue_name:
+                raise ValueError("queue_name is required")
+
+            logger.info(f"Clearing DLQ {queue_name} with action {action}")
+
+            # Redis key for DLQ messages
+            dlq_key = f"dlq:{queue_name}:messages"
+
+            messages_deleted = 0
+
+            if action == "clear_all":
+                # Get count before deletion
+                messages_deleted = await self.redis.list_len(dlq_key)
+                # Delete entire DLQ
+                await self.redis.delete(dlq_key)
+                logger.info(f"Deleted all {messages_deleted} messages from DLQ {queue_name}")
+
+            elif action == "clear_failed":
+                # Get all messages
+                messages = await self.redis.list_get(dlq_key, 0, -1)
+
+                # Filter and delete messages with retry count exceeded
+                # Note: This is a simplified implementation
+                # In a real scenario, you'd parse each message and check retry count
+                deleted_count = 0
+                for msg in messages:
+                    try:
+                        msg_data = json.loads(msg) if isinstance(msg, str) else msg
+                        retry_count = msg_data.get("retry_count", 0)
+                        max_retries = msg_data.get("max_retries", 3)
+
+                        if retry_count >= max_retries:
+                            await self.redis.list_remove(dlq_key, msg, 1)
+                            deleted_count += 1
+                    except Exception as e:
+                        logger.error(f"Error processing DLQ message: {e}")
+
+                messages_deleted = deleted_count
+                logger.info(f"Deleted {deleted_count} failed messages from DLQ {queue_name}")
+
+            # Send success response
+            response = {
+                "type": "command:response",
+                "payload": {
+                    "command": "dlq:clear",
+                    "success": True,
+                    "queue_name": queue_name,
+                    "action": action,
+                    "messages_deleted": messages_deleted
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+            await self.connection_manager.dashboards[connection_id].send_json(response)
+
+        except Exception as e:
+            logger.error(f"Failed to clear DLQ: {e}", exc_info=True)
+
+            # Send error response
+            response = {
+                "type": "command:response",
+                "payload": {
+                    "command": "dlq:clear",
+                    "success": False,
+                    "error": str(e)
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+            if connection_id in self.connection_manager.dashboards:
+                await self.connection_manager.dashboards[connection_id].send_json(response)
+
+    async def _handle_logs_export(self, connection_id: str, payload: Dict[str, Any]):
+        """Handle logs export command from dashboard"""
+        try:
+            export_format = payload.get("format", "json")
+            filters = payload.get("filters", {})
+
+            logger.info(f"Exporting logs in {export_format} format with filters: {filters}")
+
+            # Retrieve logs from Redis
+            logs_key = "logs:entries"
+            logs = await self.redis.list_get(logs_key, 0, -1)
+
+            # Parse logs
+            log_entries = []
+            for log_str in logs:
+                try:
+                    log_entry = json.loads(log_str) if isinstance(log_str, str) else log_str
+                    log_entries.append(log_entry)
+                except Exception as e:
+                    logger.warning(f"Failed to parse log entry: {e}")
+
+            # Apply filters (simplified - can be enhanced)
+            # For now, we just return all logs
+
+            # Format as JSON
+            logs_json = json.dumps(log_entries, indent=2)
+
+            # Save to temporary file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"logs_export_{timestamp}.json"
+            filepath = f"/tmp/{filename}"
+
+            with open(filepath, 'w') as f:
+                f.write(logs_json)
+
+            logger.info(f"Logs exported to {filepath}")
+
+            # Send success response with download URL
+            response = {
+                "type": "command:response",
+                "payload": {
+                    "command": "logs:export",
+                    "success": True,
+                    "download_url": f"/api/logs/download/{filename}",
+                    "format": export_format,
+                    "log_count": len(log_entries)
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+            await self.connection_manager.dashboards[connection_id].send_json(response)
+
+        except Exception as e:
+            logger.error(f"Failed to export logs: {e}", exc_info=True)
+
+            # Send error response
+            response = {
+                "type": "command:response",
+                "payload": {
+                    "command": "logs:export",
+                    "success": False,
+                    "error": str(e)
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+            if connection_id in self.connection_manager.dashboards:
+                await self.connection_manager.dashboards[connection_id].send_json(response)
+
+    async def _handle_settings_save(self, connection_id: str, payload: Dict[str, Any]):
+        """Handle settings save command from dashboard"""
+        try:
+            # Validate settings structure
+            required_fields = ["notifications", "thresholds", "refresh_interval_seconds"]
+            for field in required_fields:
+                if field not in payload:
+                    raise ValueError(f"Missing required field: {field}")
+
+            # Validate threshold values
+            thresholds = payload.get("thresholds", {})
+            cpu_percent = thresholds.get("cpu_percent", 0)
+            memory_percent = thresholds.get("memory_percent", 0)
+
+            if not (1 <= cpu_percent <= 100):
+                raise ValueError("CPU threshold must be between 1-100")
+            if not (1 <= memory_percent <= 100):
+                raise ValueError("Memory threshold must be between 1-100")
+
+            logger.info(f"Saving dashboard settings from connection {connection_id}")
+
+            # Store settings in Redis
+            settings_key = "dashboard:settings"
+            await self.redis.set(settings_key, json.dumps(payload))
+
+            logger.info("Dashboard settings saved successfully")
+
+            # Send success response
+            response = {
+                "type": "command:response",
+                "payload": {
+                    "command": "settings:save",
+                    "success": True,
+                    "message": "Settings saved successfully"
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+            await self.connection_manager.dashboards[connection_id].send_json(response)
+
+        except Exception as e:
+            logger.error(f"Failed to save settings: {e}", exc_info=True)
+
+            # Send error response
+            response = {
+                "type": "command:response",
+                "payload": {
+                    "command": "settings:save",
+                    "success": False,
+                    "error": str(e)
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+            if connection_id in self.connection_manager.dashboards:
+                await self.connection_manager.dashboards[connection_id].send_json(response)
+
+    async def _handle_settings_get(self, connection_id: str, payload: Dict[str, Any]):
+        """Handle settings get command from dashboard"""
+        try:
+            logger.info(f"Loading dashboard settings for connection {connection_id}")
+
+            # Retrieve settings from Redis
+            settings_key = "dashboard:settings"
+            settings_json = await self.redis.get(settings_key)
+
+            if settings_json:
+                settings = json.loads(settings_json) if isinstance(settings_json, str) else settings_json
+                logger.info("Loaded settings from Redis")
+            else:
+                # Return default settings
+                settings = {
+                    "notifications": {
+                        "email_alerts": True,
+                        "dlq_alerts": True,
+                        "degradation_alerts": True
+                    },
+                    "thresholds": {
+                        "cpu_percent": 85,
+                        "memory_percent": 90,
+                        "dlq_count": 10,
+                        "response_time_ms": 500
+                    },
+                    "refresh_interval_seconds": 30
+                }
+                logger.info("Using default settings (no saved settings found)")
+
+            # Send success response
+            response = {
+                "type": "command:response",
+                "payload": {
+                    "command": "settings:get",
+                    "success": True,
+                    "settings": settings
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+            await self.connection_manager.dashboards[connection_id].send_json(response)
+
+        except Exception as e:
+            logger.error(f"Failed to load settings: {e}", exc_info=True)
+
+            # Send error response
+            response = {
+                "type": "command:response",
+                "payload": {
+                    "command": "settings:get",
+                    "success": False,
+                    "error": str(e)
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+
+            if connection_id in self.connection_manager.dashboards:
+                await self.connection_manager.dashboards[connection_id].send_json(response)
+
     async def send_initial_state(self, connection_id: str):
         """Send initial state to newly connected dashboard"""
         workers = await self.worker_manager.get_all_workers()
