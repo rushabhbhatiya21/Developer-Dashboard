@@ -1714,6 +1714,38 @@ async def health_check():
     }
 
 
+@app.get("/api/logs/download/{filename}")
+async def download_logs(filename: str):
+    """
+    Download exported log files
+    Security: Only allows files matching logs_export_*.json pattern
+    """
+    import re
+    from fastapi.responses import FileResponse
+
+    # Validate filename to prevent path traversal
+    if not re.match(r'^logs_export_\d{8}_\d{6}\.json$', filename):
+        return {"error": "Invalid filename format"}, 400
+
+    # Check for path traversal attempts
+    if '..' in filename or '/' in filename:
+        return {"error": "Invalid filename"}, 400
+
+    filepath = f"/tmp/{filename}"
+
+    # Check if file exists
+    if not os.path.exists(filepath):
+        return {"error": "File not found"}, 404
+
+    # Return file for download
+    return FileResponse(
+        filepath,
+        media_type="application/json",
+        filename=filename,
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
 if __name__ == "__main__":
     port = int(os.getenv("DASHBOARD_PORT", 8090))
     uvicorn.run(
