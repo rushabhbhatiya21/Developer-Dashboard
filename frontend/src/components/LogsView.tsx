@@ -106,6 +106,10 @@ export function LogsView() {
       setIsConnected(false);
     });
 
+    const unsubscribeClosed = socketService.subscribe('connection_closed', () => {
+      setIsConnected(false);
+    });
+
     const unsubscribeWorkerStatus = socketService.subscribe('worker_status_change', (data) => {
       addLogEntry('info', data.worker.name, `Worker status changed to ${data.worker.worker_status}`);
     });
@@ -118,12 +122,35 @@ export function LogsView() {
       addLogEntry('warning', 'System', `Worker ${data.worker_id} deregistered`);
     });
 
+    // Subscribe to command responses for export operations
+    const unsubscribeResponse = socketService.subscribe('command_response', (message) => {
+      const { payload } = message;
+
+      if (payload.command === 'logs:export') {
+        setIsExporting(false);
+
+        if (payload.success) {
+          console.log('Logs export successful:', payload);
+          // Open download URL in new tab
+          if (payload.download_url) {
+            window.open(payload.download_url, '_blank');
+          }
+          alert(`Logs exported successfully! ${payload.log_count || 0} entries.`);
+        } else {
+          console.error('Failed to export logs:', payload.error);
+          alert(`Error exporting logs: ${payload.error}`);
+        }
+      }
+    });
+
     return () => {
       unsubscribeOpen();
       unsubscribeError();
+      unsubscribeClosed();
       unsubscribeWorkerStatus();
       unsubscribeWorkerReg();
       unsubscribeWorkerDereg();
+      unsubscribeResponse();
     };
   }, []);
 
