@@ -4,9 +4,9 @@ import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { SidebarTrigger } from "./ui/sidebar";
 import { ScrollArea } from "./ui/scroll-area";
-import { Search, Download, RefreshCw } from "lucide-react";
+import { Search, Download, RefreshCw, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { socketService } from "../services/socketService";
+import { socketService, sendMessage } from "../services/socketService";
 
 interface LogEntry {
   id: string;
