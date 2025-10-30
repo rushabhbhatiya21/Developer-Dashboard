@@ -93,6 +93,7 @@ function getLevelColor(level: string): string {
 export function LogsView() {
   const [logs, setLogs] = useState<LogEntry[]>(defaultLogs);
   const [isConnected, setIsConnected] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     socketService.connect();
