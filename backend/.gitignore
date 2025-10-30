@@ -1,0 +1,14 @@
+*devt*
+__pycache__
+logs
+data
+uploads
+.venv
+.env*
+*.env*
+*venv*
+**/.idea
+.idea
+
+**/*.json
+**/test**
