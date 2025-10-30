@@ -280,7 +280,13 @@ export function QueuesView() {
                     <TableCell>
                       <div className="flex gap-1">
                         {queue.name.startsWith("dlq") && queue.messages > 0 && (
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteDLQ(queue.id, queue.name)}
+                            disabled={!isConnected || deletingQueues.has(queue.name)}
+                            title={!isConnected ? 'Connect to server to delete' : 'Delete DLQ messages'}
+                          >
                             <Trash2 className="size-4" />
                           </Button>
                         )}
