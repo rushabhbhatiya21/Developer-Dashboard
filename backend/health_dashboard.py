@@ -1245,9 +1245,22 @@ class WebSocketManager:
     async def handle_dashboard_message(self, connection_id: str, message: Dict[str, Any]):
         """Route incoming dashboard messages"""
         msg_type = message.get("type")
+        payload = message.get("payload", {})
 
         if msg_type == "command:restart":
-            await self._handle_restart_command(message.get("payload", {}))
+            await self._handle_restart_command(payload)
+
+        elif msg_type == "dlq:clear":
+            await self._handle_dlq_clear(connection_id, payload)
+
+        elif msg_type == "logs:export":
+            await self._handle_logs_export(connection_id, payload)
+
+        elif msg_type == "settings:save":
+            await self._handle_settings_save(connection_id, payload)
+
+        elif msg_type == "settings:get":
+            await self._handle_settings_get(connection_id, payload)
 
         else:
             logger.warning(f"Unknown message type from dashboard: {msg_type}")
