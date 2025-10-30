@@ -1194,6 +1194,7 @@ class WebSocketManager:
     """Main orchestrator for WebSocket-based health dashboard"""
 
     def __init__(self, redis_service: AsyncRedisClient):
+        self.redis = redis_service
         self.connection_manager = ConnectionManager()
         self.worker_manager = WorkerManager(redis_service)
         self.health_monitor = HealthMonitor(
