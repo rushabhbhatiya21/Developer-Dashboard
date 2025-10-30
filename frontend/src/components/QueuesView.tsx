@@ -5,7 +5,7 @@ import { SidebarTrigger } from "./ui/sidebar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { AlertCircle, AlertTriangle, CheckCircle, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { socketService } from "../services/socketService";
+import { socketService, sendMessage, getConnectionState } from "../services/socketService";
 
 interface QueueDetail {
   id: string;
@@ -79,6 +79,7 @@ function getStatusIcon(status: string) {
 export function QueuesView() {
   const [queues, setQueues] = useState<QueueDetail[]>(defaultQueues);
   const [isConnected, setIsConnected] = useState(false);
+  const [deletingQueues, setDeletingQueues] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     socketService.connect();
@@ -91,6 +92,10 @@ export function QueuesView() {
       setIsConnected(false);
     });
 
+    const unsubscribeClosed = socketService.subscribe('connection_closed', () => {
+      setIsConnected(false);
+    });
+
     const unsubscribeInitial = socketService.subscribe('initial_data', (data) => {
       updateQueuesFromData(data);
     });
@@ -99,11 +104,39 @@ export function QueuesView() {
       updateQueuesFromData(data);
     });
 
+    // Subscribe to command responses for delete operations
+    const unsubscribeResponse = socketService.subscribe('command_response', (message) => {
+      const { payload } = message;
+
+      if (payload.command === 'dlq:clear') {
+        const queueName = payload.queue_name;
+
+        // Remove queue from deleting state
+        setDeletingQueues(prev => {
+          const next = new Set(prev);
+          next.delete(queueName);
+          return next;
+        });
+
+        if (payload.success) {
+          console.log(`DLQ ${queueName} cleared successfully:`, payload);
+          alert(`Successfully deleted ${payload.messages_deleted || 0} messages from ${queueName}`);
+          // Refresh data after successful delete
+          handleRefresh();
+        } else {
+          console.error(`Failed to clear DLQ ${queueName}:`, payload.error);
+          alert(`Error deleting DLQ: ${payload.error}`);
+        }
+      }
+    });
+
     return () => {
       unsubscribeOpen();
       unsubscribeError();
+      unsubscribeClosed();
       unsubscribeInitial();
       unsubscribeUpdate();
+      unsubscribeResponse();
     };
   }, []);
 
@@ -129,6 +162,50 @@ export function QueuesView() {
     });
 
     setQueues(updatedQueues);
+  };
+
+  /**
+   * Handle DLQ delete operation with user confirmation
+   * @param queueId Queue ID
+   * @param queueName Queue name to delete
+   */
+  const handleDeleteDLQ = async (queueId: string, queueName: string) => {
+    if (!isConnected) {
+      alert('Cannot delete: Not connected to server');
+      return;
+    }
+
+    // Show confirmation dialog with action selection
+    const confirmMessage = `Delete DLQ '${queueName}'?\n\nClick OK to delete ALL messages\nClick Cancel to delete only failed messages\n\nPress Escape to abort`;
+    const userChoice = window.confirm(confirmMessage);
+
+    if (userChoice === undefined || userChoice === null) {
+      // User pressed Escape or closed dialog
+      return;
+    }
+
+    const action = userChoice ? 'clear_all' : 'clear_failed';
+
+    // Mark queue as being deleted
+    setDeletingQueues(prev => new Set(prev).add(queueName));
+
+    try {
+      await sendMessage('dlq:clear', {
+        queue_name: queueName,
+        action: action
+      });
+      console.log(`Sent dlq:clear command for ${queueName} with action ${action}`);
+    } catch (error) {
+      console.error('Failed to send delete command:', error);
+      alert(`Failed to delete DLQ: ${error}`);
+
+      // Remove from deleting state on error
+      setDeletingQueues(prev => {
+        const next = new Set(prev);
+        next.delete(queueName);
+        return next;
+      });
+    }
   };
 
   const handleRefresh = () => {
@@ -203,7 +280,13 @@ export function QueuesView() {
                     <TableCell>
                       <div className="flex gap-1">
                         {queue.name.startsWith("dlq") && queue.messages > 0 && (
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteDLQ(queue.id, queue.name)}
+                            disabled={!isConnected || deletingQueues.has(queue.name)}
+                            title={!isConnected ? 'Connect to server to delete' : 'Delete DLQ messages'}
+                          >
                             <Trash2 className="size-4" />
                           </Button>
                         )}

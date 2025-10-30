@@ -4,9 +4,9 @@ import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { SidebarTrigger } from "./ui/sidebar";
 import { ScrollArea } from "./ui/scroll-area";
-import { Search, Download, RefreshCw } from "lucide-react";
+import { Search, Download, RefreshCw, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { socketService } from "../services/socketService";
+import { socketService, sendMessage } from "../services/socketService";
 
 interface LogEntry {
   id: string;
@@ -93,6 +93,7 @@ function getLevelColor(level: string): string {
 export function LogsView() {
   const [logs, setLogs] = useState<LogEntry[]>(defaultLogs);
   const [isConnected, setIsConnected] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     socketService.connect();
@@ -102,6 +103,10 @@ export function LogsView() {
     });
 
     const unsubscribeError = socketService.subscribe('connection_error', () => {
+      setIsConnected(false);
+    });
+
+    const unsubscribeClosed = socketService.subscribe('connection_closed', () => {
       setIsConnected(false);
     });
 
@@ -117,12 +122,35 @@ export function LogsView() {
       addLogEntry('warning', 'System', `Worker ${data.worker_id} deregistered`);
     });
 
+    // Subscribe to command responses for export operations
+    const unsubscribeResponse = socketService.subscribe('command_response', (message) => {
+      const { payload } = message;
+
+      if (payload.command === 'logs:export') {
+        setIsExporting(false);
+
+        if (payload.success) {
+          console.log('Logs export successful:', payload);
+          // Open download URL in new tab
+          if (payload.download_url) {
+            window.open(payload.download_url, '_blank');
+          }
+          alert(`Logs exported successfully! ${payload.log_count || 0} entries.`);
+        } else {
+          console.error('Failed to export logs:', payload.error);
+          alert(`Error exporting logs: ${payload.error}`);
+        }
+      }
+    });
+
     return () => {
       unsubscribeOpen();
       unsubscribeError();
+      unsubscribeClosed();
       unsubscribeWorkerStatus();
       unsubscribeWorkerReg();
       unsubscribeWorkerDereg();
+      unsubscribeResponse();
     };
   }, []);
 
@@ -135,6 +163,36 @@ export function LogsView() {
       message,
     };
     setLogs((prev) => [newLog, ...prev].slice(0, 100));
+  };
+
+  /**
+   * Handle log export operation
+   * Requests logs export from backend and triggers download
+   */
+  const handleExportLogs = async () => {
+    if (!isConnected) {
+      alert('Cannot export: Not connected to server');
+      return;
+    }
+
+    if (isExporting) {
+      // Prevent multiple simultaneous exports
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      await sendMessage('logs:export', {
+        format: 'json',
+        filters: {}
+      });
+      console.log('Sent logs:export command');
+    } catch (error) {
+      console.error('Failed to send export command:', error);
+      alert(`Failed to export logs: ${error}`);
+      setIsExporting(false);
+    }
   };
 
   const handleRefresh = () => {
@@ -164,9 +222,24 @@ export function LogsView() {
               <RefreshCw className="size-4 mr-2" />
               Refresh
             </Button>
-            <Button variant="outline" size="sm">
-              <Download className="size-4 mr-2" />
-              Export
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportLogs}
+              disabled={!isConnected || isExporting}
+              title={!isConnected ? 'Connect to server to export' : 'Export logs as JSON'}
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="size-4 mr-2" />
+                  Export
+                </>
+              )}
             </Button>
           </div>
         </div>
