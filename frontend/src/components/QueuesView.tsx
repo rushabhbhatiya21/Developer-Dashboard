@@ -164,6 +164,50 @@ export function QueuesView() {
     setQueues(updatedQueues);
   };
 
+  /**
+   * Handle DLQ delete operation with user confirmation
+   * @param queueId Queue ID
+   * @param queueName Queue name to delete
+   */
+  const handleDeleteDLQ = async (queueId: string, queueName: string) => {
+    if (!isConnected) {
+      alert('Cannot delete: Not connected to server');
+      return;
+    }
+
+    // Show confirmation dialog with action selection
+    const confirmMessage = `Delete DLQ '${queueName}'?\n\nClick OK to delete ALL messages\nClick Cancel to delete only failed messages\n\nPress Escape to abort`;
+    const userChoice = window.confirm(confirmMessage);
+
+    if (userChoice === undefined || userChoice === null) {
+      // User pressed Escape or closed dialog
+      return;
+    }
+
+    const action = userChoice ? 'clear_all' : 'clear_failed';
+
+    // Mark queue as being deleted
+    setDeletingQueues(prev => new Set(prev).add(queueName));
+
+    try {
+      await sendMessage('dlq:clear', {
+        queue_name: queueName,
+        action: action
+      });
+      console.log(`Sent dlq:clear command for ${queueName} with action ${action}`);
+    } catch (error) {
+      console.error('Failed to send delete command:', error);
+      alert(`Failed to delete DLQ: ${error}`);
+
+      // Remove from deleting state on error
+      setDeletingQueues(prev => {
+        const next = new Set(prev);
+        next.delete(queueName);
+        return next;
+      });
+    }
+  };
+
   const handleRefresh = () => {
     socketService.disconnect();
     socketService.connect();
