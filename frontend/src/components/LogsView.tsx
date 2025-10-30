@@ -165,6 +165,36 @@ export function LogsView() {
     setLogs((prev) => [newLog, ...prev].slice(0, 100));
   };
 
+  /**
+   * Handle log export operation
+   * Requests logs export from backend and triggers download
+   */
+  const handleExportLogs = async () => {
+    if (!isConnected) {
+      alert('Cannot export: Not connected to server');
+      return;
+    }
+
+    if (isExporting) {
+      // Prevent multiple simultaneous exports
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      await sendMessage('logs:export', {
+        format: 'json',
+        filters: {}
+      });
+      console.log('Sent logs:export command');
+    } catch (error) {
+      console.error('Failed to send export command:', error);
+      alert(`Failed to export logs: ${error}`);
+      setIsExporting(false);
+    }
+  };
+
   const handleRefresh = () => {
     socketService.disconnect();
     socketService.connect();
