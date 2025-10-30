@@ -5,7 +5,7 @@ import { SidebarTrigger } from "./ui/sidebar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table";
 import { AlertCircle, AlertTriangle, CheckCircle, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { socketService } from "../services/socketService";
+import { socketService, sendMessage, getConnectionState } from "../services/socketService";
 
 interface QueueDetail {
   id: string;
