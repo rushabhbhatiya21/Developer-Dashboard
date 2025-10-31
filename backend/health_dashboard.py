@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional, Callable, Awaitable
 
 
-from shared.config import get_settings # type: ignore
+# from shared.config import get_settings # type: ignore
 
 # Configure logging
 logging.basicConfig(
@@ -48,7 +48,7 @@ class AsyncRedisClient:
     _instance = None
     _lock = asyncio.Lock()
 
-    def __init__(self, host: str = get_settings().redis_host, port: int = get_settings().redis_port, **kwargs):
+    def __init__(self, host: str = 'redis', port: int = 6379, **kwargs):
         """
         Initialize the Redis client with connection parameters.
 
