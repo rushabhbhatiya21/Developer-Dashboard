@@ -2,6 +2,9 @@ services:
   # Health Dashboard Service
   backend:
     container_name: dashboard_backend
+    depends_on:
+     redis:
+       condition: service_healthy
     build:
       context: backend
       dockerfile: Dockerfile
@@ -33,6 +36,19 @@ services:
       - batchsmart
     depends_on:
       - backend
+
+  redis:
+    image: redis/redis-stack:7.4.0-v3
+    ports:
+      - "6378:6379"
+      - "8002:8001"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - batchsmart
 
 volumes:
   log_data:
